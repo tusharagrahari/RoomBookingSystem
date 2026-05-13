@@ -37,4 +37,15 @@ public class Booking {
     public LocalDate getEndDate() {
         return this.endDate;
     }
+
+    @Override
+    public String toString() {
+        return "Booking{" +
+                "bookingId=" + bookingId +
+                ", userId=" + userId +
+                ", roomId=" + roomId +
+                ", startDate=" + startDate +
+                ", endDate=" + endDate +
+                "}";
+    }
 }
