@@ -39,20 +39,74 @@ public class BookingManager implements RoomBookingSystem {
         return room;
     }
 
-    public Booking bookRoom(String userId, LocalDate starDate, LocalDate endDate) {
+    public synchronized Booking bookRoom(String userId, LocalDate startDate, LocalDate endDate) {
+        if (!startDate.isBefore(endDate)) {
+            throw new IllegalArgumentException("Start date must be before end date");
+        }
 
+        if (!users.containsKey(userId)) {
+            throw new IllegalArgumentException("User not found");
+        }
 
+        for (Room room : rooms.values()) {
+            boolean isAvailable = true;
+            Map<LocalDate, String> dayMap = roomAvailability.get(room.getRoomId());
+
+            for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
+                if (dayMap.containsKey(d)) {
+                    isAvailable = false;
+                    break;
+                }
+            }
+
+            if (isAvailable) {
+                Booking booking = new Booking(userId, room.getRoomId(), startDate, endDate);
+                bookings.put(booking.getBookingId(), booking);
+                bookingsByUser.get(userId).add(booking);
+                bookingsByRoom.get(room.getRoomId()).add(booking);
+
+                for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
+                    dayMap.put(d, booking.getBookingId());
+                }
+
+                return booking;
+            }
+        }
+
+        throw new IllegalStateException("No rooms available for the given period");
     }
 
-    public void cancelBooking(String bookingId, String userId) {
+    public synchronized void cancelBooking(String bookingId, String userId) {
+        Booking booking = bookings.get(bookingId);
+        if (booking == null) {
+            throw new IllegalArgumentException("Booking not found");
+        }
 
+        if (!booking.getUserId().equals(userId)) {
+            throw new IllegalArgumentException("Not authorized to cancel this booking");
+        }
+
+        bookings.remove(bookingId);
+        bookingsByUser.get(userId).removeIf(b -> b.getBookingId().equals(bookingId));
+        bookingsByRoom.get(booking.getRoomId()).removeIf(b -> b.getBookingId().equals(bookingId));
+
+        Map<LocalDate, String> dayMap = roomAvailability.get(booking.getRoomId());
+        for (LocalDate d = booking.getStartDate(); d.isBefore(booking.getEndDate()); d = d.plusDays(1)) {
+            dayMap.remove(d);
+        }
     }
 
     public List<Booking> getBookingsByUser(String userId) {
-
+        if (!users.containsKey(userId)) {
+            throw new IllegalArgumentException("User not found");
+        }
+        return bookingsByUser.get(userId);
     }
 
     public List<Booking> getBookingsByRoom(String roomId) {
-
+        if (!rooms.containsKey(roomId)) {
+            throw new IllegalArgumentException("Room not found");
+        }
+        return bookingsByRoom.get(roomId);
     }
 }
